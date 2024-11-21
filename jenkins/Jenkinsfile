@@ -46,7 +46,7 @@ EOF
         
         stage('Checkout') {
             steps {
-                git branch: "master", url: 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+                git branch: "master", url: 'https://github.com/Syndrizzle/example-java-maven-app.git'
             }
         }
 
