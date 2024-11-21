@@ -8,8 +8,12 @@ pipeline {
     }
     
     triggers {
-        pollSCM('*/5 * * * *')
+        pollSCM('H/5 * * * *')
         githubPush()
+    }
+
+    parameters {
+        string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch to build')
     }
     
     stages {
@@ -59,6 +63,7 @@ EOF
                         mvn clean package -DskipTests
                     '''
                 }
+                archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
             }
         }
 
@@ -85,6 +90,12 @@ EOF
     }
     
     post {
+        success {
+            echo "Pipeline succeeded!"
+        }
+        failure {
+            echo "Pipeline failed!"
+        }
         always {
             cleanWs()
         }
