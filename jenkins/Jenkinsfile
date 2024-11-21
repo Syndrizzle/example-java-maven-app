@@ -1,19 +1,74 @@
 pipeline {
     agent {
-        docker {
-            image 'maven:3.9.0'
-            args '-v /root/.m2:/root/.m2'
-        }
+        label 'maven'  // This will make the pipeline run on nodes labeled 'maven'
     }
+    
+    options {
+        timeout(time: 1, unit: 'MINUTES')
+    }
+    
+    triggers {
+        pollSCM('*/5 * * * *')
+        githubPush()
+    }
+    
     stages {
-        stage('Build') {
+        stage('Setup Maven') {
             steps {
-                sh 'mvn -B -DskipTests clean package'
+                script {
+                    def mavenCheck = sh(script: 'test -d /opt/maven && echo "Maven Exists"', returnStdout: true).trim()
+                    if (mavenCheck != "Maven Exists") {
+                        echo "Maven not found. Setting up Maven..."
+                        sh '''
+                            MAVEN_VERSION=3.9.9
+                            INSTALL_DIR=/opt/maven
+                            PROFILE_SCRIPT=/etc/profile.d/maven.sh
+
+                            wget https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz -O /tmp/maven.tar.gz
+                            sudo mkdir -p ${INSTALL_DIR}
+                            sudo tar -xzf /tmp/maven.tar.gz --strip-components=1 -C ${INSTALL_DIR}
+                            rm -f /tmp/maven.tar.gz
+
+                            sudo tee ${PROFILE_SCRIPT} > /dev/null << EOF
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
+export M2_HOME=/opt/maven
+export MAVEN_HOME=/opt/maven
+export PATH=\${M2_HOME}/bin:\${PATH}
+EOF
+                            sudo chmod +x ${PROFILE_SCRIPT}
+                        '''
+                    } else {
+                        echo "Maven is already set up"
+                    }
+                }
             }
         }
+        
+        stage('Checkout') {
+            steps {
+                git branch: "master", url: 'https://github.com/jenkins-docs/simple-java-maven-app.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    echo "Building the project..."
+                    sh '''
+                        . /etc/profile.d/maven.sh
+                        mvn clean package -DskipTests
+                    '''
+                }
+            }
+        }
+
+        
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh '''
+                    . /etc/profile.d/maven.sh
+                    mvn test
+                '''
             }
             post {
                 always {
@@ -21,10 +76,17 @@ pipeline {
                 }
             }
         }
-        stage('Deliver') {
+        
+        stage('Deliver') { 
             steps {
-                sh './jenkins/scripts/deliver.sh'
+                sh './jenkins/scripts/deliver.sh' 
             }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
         }
     }
 }
