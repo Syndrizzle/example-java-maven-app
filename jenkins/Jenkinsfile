@@ -16,9 +16,9 @@ pipeline {
     }
 
     parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch to build')
+      gitParameter branch: '', branchFilter: '.*', defaultValue: 'origin/master', description: 'Choose the specified Git Branch to build from.', name: 'Branch', quickFilterEnabled: false, requiredParameter: true, selectedValue: 'NONE', sortMode: 'NONE', tagFilter: '*', type: 'GitParameterDefinition'
     }
-    
+
     stages {        
         stage('Checkout') {
             steps {
