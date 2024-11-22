@@ -1,14 +1,19 @@
 pipeline {
     agent {
-        label 'maven'  // This will make the pipeline run on nodes labeled 'maven'
+        label 'maven' 
     }
     
     options {
         timeout(time: 1, unit: 'MINUTES')
     }
-    
+
+    tools {
+        maven 'Maven 3.9.9'
+        jdk 'Java 17'
+    }
+
     triggers {
-        pollSCM('H/5 * * * *')
+        // pollSCM('H/5 * * * *') // Disable Polling for now.
         githubPush()
     }
 
@@ -16,38 +21,7 @@ pipeline {
         string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch to build')
     }
     
-    stages {
-        stage('Setup Maven') {
-            steps {
-                script {
-                    def mavenCheck = sh(script: 'test -d /opt/maven && echo "Maven Exists"', returnStdout: true).trim()
-                    if (mavenCheck != "Maven Exists") {
-                        echo "Maven not found. Setting up Maven..."
-                        sh '''
-                            MAVEN_VERSION=3.9.9
-                            INSTALL_DIR=/opt/maven
-                            PROFILE_SCRIPT=/etc/profile.d/maven.sh
-
-                            wget https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz -O /tmp/maven.tar.gz
-                            sudo mkdir -p ${INSTALL_DIR}
-                            sudo tar -xzf /tmp/maven.tar.gz --strip-components=1 -C ${INSTALL_DIR}
-                            rm -f /tmp/maven.tar.gz
-
-                            sudo tee ${PROFILE_SCRIPT} > /dev/null << EOF
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
-export M2_HOME=/opt/maven
-export MAVEN_HOME=/opt/maven
-export PATH=\${M2_HOME}/bin:\${PATH}
-EOF
-                            sudo chmod +x ${PROFILE_SCRIPT}
-                        '''
-                    } else {
-                        echo "Maven is already set up"
-                    }
-                }
-            }
-        }
-        
+    stages {        
         stage('Checkout') {
             steps {
                 git branch: "master", url: 'https://github.com/Syndrizzle/example-java-maven-app.git'
@@ -59,7 +33,6 @@ EOF
                 script {
                     echo "Building the project..."
                     sh '''
-                        . /etc/profile.d/maven.sh
                         mvn clean package -DskipTests
                     '''
                 }
@@ -71,7 +44,6 @@ EOF
         stage('Test') {
             steps {
                 sh '''
-                    . /etc/profile.d/maven.sh
                     mvn test
                 '''
             }
